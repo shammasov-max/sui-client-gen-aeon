@@ -373,7 +373,7 @@ impl<'env, 'a> StructClassImportCtx<'env, 'a> {
     }
 }
 
-fn get_origin_pkg_addr<T: Env>(env: &T, type_origin_table: &TypeOriginTable) -> AccountAddress {
+fn get_origin_pkg_addr(env: &dyn Env, type_origin_table: &TypeOriginTable) -> AccountAddress {
     let addr = env.module_env().self_address();
     let types = type_origin_table.get(addr).unwrap_or_else(|| {
         panic!(
@@ -393,7 +393,28 @@ fn get_origin_pkg_addr<T: Env>(env: &T, type_origin_table: &TypeOriginTable) -> 
     *origin_addr
 }
 
-fn get_full_name_with_address_str<T: Env>(env: &T, type_origin_table: &TypeOriginTable) -> String {
+// fn get_origin_pkg_addr<T: Env>(env: &T, type_origin_table: &TypeOriginTable) -> AccountAddress {
+//     let addr = env.module_env().self_address();
+//     let types = type_origin_table.get(addr).unwrap_or_else(|| {
+//         panic!(
+//             "expected origin table to exist for package {}",
+//             addr.to_hex_literal()
+//         )
+//     });
+//     let origin_addr = types.get(&env.get_full_name_str()).unwrap_or_else(|| {
+//         panic!(
+//             "unable to find origin address for {} in package {}. \
+//             check consistency between original id and published at for this package.",
+//             env.get_full_name_str(),
+//             addr.to_hex_literal()
+//         )
+//     });
+
+//     *origin_addr
+// }
+
+
+fn get_full_name_with_address_str(env: &dyn Env, type_origin_table: &TypeOriginTable) -> String {
     let origin_pkg_addr = get_origin_pkg_addr(env, type_origin_table);
     format!(
         "{}::{}",
@@ -401,6 +422,17 @@ fn get_full_name_with_address_str<T: Env>(env: &T, type_origin_table: &TypeOrigi
         env.get_full_name_str()
     )
 }
+
+// fn get_full_name_with_address_str<T: Env>(env: &T, type_origin_table: &TypeOriginTable) -> String {
+//     let origin_pkg_addr = get_origin_pkg_addr(env, type_origin_table);
+//     format!(
+//         "{}::{}",
+//         origin_pkg_addr.to_hex_literal(),
+//         env.get_full_name_str()
+//     )
+// }
+
+
 
 fn gen_full_name_with_address<T: Env>(
     env: &T,
@@ -590,10 +622,19 @@ fn gen_bcs_def_for_type(
             },
             Type::Datatype(mid, sid, ts) => {
                 let module_env = env.get_module(*mid);
-                todo_panic_if_enum(&module_env, sid);
+                // todo_panic_if_enum(&module_env, sid);
 
-                let struct_env = module_env.into_struct(*sid);
-                let class = import_ctx.get_class(&struct_env);
+
+                let field_val: Box<dyn Env> = match (module_env.find_struct(sid.symbol()), module_env.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(module_env.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(module_env.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                
+                let class = import_ctx.get_class(&*field_val);
+
+                // let struct_env = module_env.into_struct(*sid);
+                // let class = import_ctx.get_class(&struct_env);
 
                 toks.append(Item::Literal(ItemStr::from("${")));
                 quote_in! { *toks => $(class).$$typeName };
@@ -1125,8 +1166,8 @@ impl<'env, 'a> StructsGen<'env, 'a> {
         }
     }
 
-    fn get_full_name_with_address_str(&self, strct: &StructEnv) -> String {
-        get_full_name_with_address_str(strct, self.type_origin_table)
+    fn get_full_name_with_address_str(&self, env: &dyn Env) -> String {
+        get_full_name_with_address_str(env, self.type_origin_table)
     }
 
     fn gen_full_name_with_address<T: Env>(
@@ -1221,11 +1262,16 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 let field_module = self.env.get_module(*mid);
                 // todo_panic_if_enum(&field_module, sid);
 
-                let field_strct = field_module.get_struct(*sid);
-                let class = self.import_ctx.get_class(&field_strct);
+                let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(field_module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(field_module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                
+                let class = self.import_ctx.get_class(&*field_val);
 
                 let type_param_inner_toks = (0..ts.len()).map(|idx| {
-                    let wrap_to_phantom = field_strct.is_phantom_parameter(idx)
+                    let wrap_to_phantom = field_val.is_phantom_parameter(idx)
                         && match &ts[idx] {
                             Type::TypeParameter(t_idx) => {
                                 !strct.is_phantom_parameter(*t_idx as usize)
@@ -1344,12 +1390,18 @@ impl<'env, 'a> StructsGen<'env, 'a> {
             }
             Type::Datatype(mid, sid, ts) => {
                 let field_module = self.env.get_module(*mid);
-                todo_panic_if_enum(&field_module, sid);
-                let field_strct = field_module.get_struct(*sid);
+                // todo_panic_if_enum(&field_module, sid);
 
-                let class = self.import_ctx.get_class(&field_strct);
+                let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(field_module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(field_module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                
+                let class = self.import_ctx.get_class(&*field_val);
+                
                 let non_phantom_param_idxs = (0..ts.len())
-                    .filter(|idx| !field_strct.is_phantom_parameter(*idx))
+                    .filter(|idx| !(*field_val).is_phantom_parameter(*idx))
                     .collect::<Vec<_>>();
 
                 quote!($class.bcs$(if !non_phantom_param_idxs.is_empty() {
@@ -1389,14 +1441,18 @@ impl<'env, 'a> StructsGen<'env, 'a> {
             }
             Type::Datatype(mid, sid, ts) => {
                 let field_module = self.env.get_module(*mid);
-                todo_panic_if_enum(&field_module, sid);
-                let field_strct = field_module.get_struct(*sid);
-
-                let class = self.import_ctx.get_class(&field_strct);
+                
+                let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(field_module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(field_module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                                
+                let class = self.import_ctx.get_class(&*field_val);
 
                 let mut toks: Vec<js::Tokens> = vec![];
                 for (idx, ty) in ts.iter().enumerate() {
-                    let wrap_to_phantom = field_strct.is_phantom_parameter(idx)
+                    let wrap_to_phantom = (*field_val).is_phantom_parameter(idx)
                         && match &ts[idx] {
                             Type::TypeParameter(t_idx) => {
                                 !strct.is_phantom_parameter(*t_idx as usize)
@@ -1690,13 +1746,18 @@ impl<'env, 'a> StructsGen<'env, 'a> {
             }
             Type::Datatype(mid, sid, ts) => {
                 let field_module = self.env.get_module(*mid);
-                todo_panic_if_enum(&field_module, sid);
 
-                let field_strct = field_module.get_struct(*sid);
-                let class = self.import_ctx.get_class(&field_strct);
+                let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(field_module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(field_module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                
+                let class = self.import_ctx.get_class(&*field_val);
+
 
                 let type_param_inner_toks = (0..ts.len()).map(|idx| {
-                    let wrap_to_phantom = field_strct.is_phantom_parameter(idx)
+                    let wrap_to_phantom = (*field_val).is_phantom_parameter(idx)
                         && match &ts[idx] {
                             Type::TypeParameter(t_idx) => {
                                 !enm.is_phantom_parameter(*t_idx as usize)
@@ -1768,7 +1829,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 $(for variant in env.get_variants() join (; )=>
                     $(self.gen_variant_name(&variant)): 
                         $(if variant.get_fields().next().is_none() {
-                            True
+                            true
                         } else {
                             $(for field in variant.get_fields() join (; )=> $(
                                 self.gen_enum_class_variant_type(env, &field.get_type(), Vec::<Symbol>::new(), None, None)
@@ -1784,18 +1845,20 @@ impl<'env, 'a> StructsGen<'env, 'a> {
     pub fn gen_variant_type_enum(&mut self, tokens: &mut js::Tokens, env: &EnumEnv) {
         let type_argument = &self.framework.import("reified", "TypeArgument");
         let phantom_type_argument = &self.framework.import("reified", "PhantomTypeArgument");
+        let enum_output = &js::import("@mysten/bcs", "EnumOutputShapeWithKeys");
 
         let extends_non_phantom = ExtendsOrWraps::Extends(quote!($type_argument));
         let extends_phantom = ExtendsOrWraps::Extends(quote!($phantom_type_argument));
 
+        let quote = r#"""#;
         tokens.push();
         quote_in! { *tokens =>
-            export type $(self.gen_variant_type_name_with_params(env, &extends_non_phantom, &extends_phantom)) = EnumOutputShapeWithKeys<
+            export type $(self.gen_variant_type_name_with_params(env, &extends_non_phantom, &extends_phantom)) = $(enum_output)<
                 {
                     $(for variant in env.get_variants() join (; )=>
                         $(self.gen_variant_name(&variant)): 
                             $(if variant.get_fields().next().is_none() {
-                                True
+                                true
                             } else {
                                 {
                                 $(for field in variant.get_fields() join (; )=> $(
@@ -1806,9 +1869,8 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                             })
                     )
                 },
-                // TODOX add quotes here
                 $(for variant in env.get_variants() join ( | ) =>
-                    $(self.gen_variant_name(&variant))
+                    $(quote)$(self.gen_variant_name(&variant))$(quote)
                 )
             >;
         };
@@ -2302,11 +2364,17 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                                 match field.get_type() {
                                     Type::Datatype(mid, sid, _) => {
                                         let field_module = self.env.get_module(mid);
-                                        todo_panic_if_enum(&field_module, &sid);
-                                        let field_strct = field_module.get_struct(sid);
+                                        
+                                        let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                                            (Some(_), _) => Box::new(field_module.get_struct(sid)),
+                                            (_, Some(_)) => Box::new(field_module.get_enum(sid)),
+                                            _ => panic!("Neither struct nor enum found for symbol"),
+                                        };
+                                        
+                                        // let field_strct = field_module.get_struct(sid);
 
                                         // handle special types
-                                        match self.get_full_name_with_address_str(&field_strct).as_ref() {
+                                        match self.get_full_name_with_address_str(&*field_val).as_ref() {
                                             "0x1::string::String" | "0x1::ascii::String" => {
                                                 quote_in!(*toks => $name: $this_name,)
                                             }
@@ -2561,17 +2629,18 @@ impl<'env, 'a> StructsGen<'env, 'a> {
         let bcs = &js::import("@mysten/bcs", "bcs");
         let bcs_type = &js::import("@mysten/bcs", "BcsType");
         let from_b64 = &js::import("@mysten/bcs", "fromB64");
+        
+
         let compress_sui_type = &self.framework.import("util", "compressSuiType");
 
 
-        // TOOD phantom types missing
         let enum_name = enm.get_name().display(self.symbol_pool()).to_string();
         let variants = enm.get_variants().collect::<Vec<_>>();
 
         let type_params_str = Vec::<String>::new();
 
         let params_toks_for_reified = quote!();
-        let reified_type_args_as_toks = quote!();
+        let reified_type_args_as_toks = quote!([]);
         let reified_full_type_name_as_toks = quote!($(self.gen_full_name_with_address(enm, true, true)));
         let bcs_def_name =  quote!($[str]($[const](&enum_name)));
 
@@ -2610,6 +2679,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
 
                 readonly $$typeName = $(&enum_name).$$typeName;$['\n']
                 readonly $$fullTypeName: $static_full_type_name_as_toks;$['\n']
+                readonly $$typeArgs: [];
 
                 readonly $$data: $(&enum_name)Variants
                 // readonly $$typeArgs: $type_args_field_type;$['\n']
@@ -2623,7 +2693,9 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                     this.$$data = data;$['\n']
                 }$['\n']
 
-
+                toJSONField() {
+                    throw new Error ("NOT IMPLEMENTED");
+                  }$['\n']
                 static reified$(params_toks_for_reified)(
                     $(for param in type_params_str.iter() join (, ) => $param: $param)
                 ): $(&enum_name)Reified$(
@@ -2650,13 +2722,13 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                             ),
                         bcs: $(&enum_name).bcs,
                         new:  (data:
-                                 $(self.gen_fields_if_name_with_params(enm, &wraps_to_type_argument, &wraps_phantom_to_type_argument))
+                                 $(self.gen_variant_type_name_with_params(enm, &wraps_to_type_argument, &wraps_phantom_to_type_argument))
                              ) => {
                                 return new $(&enum_name)(
-                                    [$(for param in &type_params_str join (, ) => $extract_type($param))],
+                                    [$(for param in &type_params_str join (, ) => $extract_type($param))], data
                                 )
                             },
-                        kind: "StructClassReified",
+                        kind: "EnumClassReified",
                     }
                 }$['\n']
 
