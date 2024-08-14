@@ -52,6 +52,7 @@ trait Env {
     fn symbol_pool(&self) -> &SymbolPool;
     fn get_named_type_parameters(&self) -> Vec<TypeParameter>;
     fn is_phantom_parameter(&self, idx: usize) -> bool;
+    fn get_full_name_with_address(&self) -> String;
 }
 
 impl<'env> Env for StructEnv<'env> {
@@ -89,6 +90,10 @@ impl<'env> Env for StructEnv<'env> {
 
     fn is_phantom_parameter(&self, idx: usize) -> bool {
         self.is_phantom_parameter(idx)
+    }
+
+    fn get_full_name_with_address(&self) -> String {
+        self.get_full_name_with_address()
     }
 
 
@@ -131,6 +136,10 @@ impl<'env> Env for EnumEnv<'env> {
 
     fn is_phantom_parameter(&self, idx: usize) -> bool {
         self.is_phantom_parameter(idx)
+    }
+
+    fn get_full_name_with_address(&self) -> String {
+        self.get_full_name_with_address()
     }
 
 }
@@ -767,11 +776,14 @@ impl<'env, 'a> FunctionsGen<'env, 'a> {
         match ty {
             Type::Datatype(mid, sid, ts) => {
                 let module_env = self.env.get_module(*mid);
+
                 if module_env.find_enum(sid.symbol()).is_some() {
                     return false;
                 }
-
-                match self.env.get_struct_type(*mid, *sid, ts).unwrap() {
+                // todo_panic_if_enum(&module_env, sid);
+                
+                println!("Last {}", module_env.get_struct(*sid).get_identifier().unwrap());
+                match self.env.get_datatype(*mid, *sid, ts).unwrap() {
                     MType::Struct {
                         address,
                         module,
@@ -913,11 +925,13 @@ impl<'env, 'a> FunctionsGen<'env, 'a> {
             }
             Type::Datatype(mid, sid, ts) => {
                 let module = self.env.get_module(*mid);
-                todo_panic_if_enum(&module, sid);
+                let field_val: Box<dyn Env> = match (module.find_struct(sid.symbol()), module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
 
-                let strct = module.get_struct(*sid);
-
-                match strct.get_full_name_with_address().as_ref() {
+                match field_val.get_full_name_with_address().as_ref() {
                     "0x1::string::String" | "0x1::ascii::String" => {
                         quote!(string | $transaction_argument)
                     }
@@ -963,11 +977,13 @@ impl<'env, 'a> FunctionsGen<'env, 'a> {
             Type::Vector(ty) => self.is_pure(ty),
             Type::Datatype(mid, sid, ts) => {
                 let module = self.env.get_module(*mid);
-                todo_panic_if_enum(&module, sid);
+                let field_val: Box<dyn Env> = match (module.find_struct(sid.symbol()), module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
 
-                let strct = module.get_struct(*sid);
-
-                match strct.get_full_name_with_address().as_ref() {
+                match field_val.get_full_name_with_address().as_ref() {
                     "0x1::string::String" | "0x1::ascii::String" => true,
                     "0x2::object::ID" => true,
                     "0x1::option::Option" => self.is_pure(&ts[0]),
@@ -983,11 +999,14 @@ impl<'env, 'a> FunctionsGen<'env, 'a> {
         match ty {
             Type::Datatype(mid, sid, ts) => {
                 let module = self.env.get_module(*mid);
-                todo_panic_if_enum(&module, sid);
+                let field_val: Box<dyn Env> = match (module.find_struct(sid.symbol()), module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
 
-                let strct = module.get_struct(*sid);
 
-                match strct.get_full_name_with_address().as_ref() {
+                match field_val.get_full_name_with_address().as_ref() {
                     "0x1::option::Option" => Some(&ts[0]),
                     _ => None,
                 }

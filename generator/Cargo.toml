@@ -16,17 +16,17 @@ codespan-reporting = "^0.11.1"
 convert_case = "^0.6.0"
 colored = "^2.0.0"
 
-sui-move-build = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-sui-move = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f", features = [
+sui-move-build = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+sui-move = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977", features = [
     "build",
 ] }
-sui-sdk = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-sui-json-rpc-types = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-model = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-core-types = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-binary-format = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-symbol-pool = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-bytecode-utils = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-package = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
-move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "c79f53f" }
+sui-sdk = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+sui-json-rpc-types = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-model = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-core-types = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-binary-format = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-symbol-pool = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-bytecode-utils = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-compiler = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-package = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
+move-command-line-common = { git = "https://github.com/alexanderludwig/sui", rev = "13e0977" }
