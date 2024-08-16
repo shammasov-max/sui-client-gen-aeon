@@ -443,7 +443,6 @@ export function composeSuiType(typeName: string, ...typeArgs: string[]): string 
 pub static REIFIED: &str = r#"
 import { BcsType, bcs, fromHEX, toHEX } from "@mysten/bcs";
 import {
-  DataWithTypes,
   FieldsWithTypes,
   compressSuiType,
   parseTypeName,
@@ -835,11 +834,7 @@ export function decodeFromFields(
       return ((reified as any).fromFields(field) as any).vec[0];
     }
     default:
-      if ("fromFields" in reified) {
-        return reified.fromFields(field);
-      } else {
-        throw new Error("Enum class cant be decoded from fields");
-      }
+      return reified.fromFields(field);
   }
 }
 
