@@ -2670,6 +2670,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
         let wraps_to_type_argument = ExtendsOrWraps::None;
         let wraps_phantom_to_type_argument = ExtendsOrWraps::None;
 
+        let quote = r#"""#;
 
 
         // let is_option = self.get_full_name_with_address_str(enm) == "0x1::option::Option";
@@ -2764,27 +2765,26 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 //         )$['\n']
                 //     $['\n']})
                 // };$['\n']
-
-                static get bcs() {
-                    return $bcs.enum($bcs_def_name, {$['\n']
+                static get bcs() { 
+                    return $bcs.enum($bcs_def_name, {
                         $(for variant in enm.get_variants() join (, ) =>
                             $(self.gen_variant_name(&variant)): $(
                                 if variant.get_fields().next().is_none() {
                                     null
                                 } else {
-                                    {
-                                        // TOOD add exlamation stuff
+                                    $bcs.struct( $(quote) $(self.gen_variant_name(&variant))$(quote) , {
                                         $(for field in variant.get_fields() join (, ) =>
                                             $(field.get_name().display(self.symbol_pool()).to_string()):
                                                 $(self.gen_struct_bcs_def_field_value(&field.get_type(), self.strct_type_param_names(enm)))
                                         )
-                                    }
+                                    })
                                 }
-                            )$['\n']
-                        )$['\n']
-                    });$['\n']
+                            )
+                        )
+                    });
                 }
 
+                                
                 static fromBcs(
                      data: Uint8Array
                 ): $(&enum_name) {$['\n']
