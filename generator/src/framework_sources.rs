@@ -539,7 +539,7 @@ export interface EnumClassReified<T extends EnumClass, Data> {
   fromBcs(data: Uint8Array): T;
   bcs: BcsType<any>;
   // fromJSONField: (field: any) => T;
-  // fromFields: (fields: EnumOutputShapeWithKeys<any, string>) => T;
+  fromFields: (fields: EnumOutputShapeWithKeys<any, string>) => T;
   // fromFieldsWithTypes: (item: DataWithTypes) => T;
   new: (data: Data) => T;
 

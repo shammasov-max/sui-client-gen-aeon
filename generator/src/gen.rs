@@ -1438,7 +1438,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
 
     pub fn gen_reified(
         &mut self,
-        strct: &StructEnv,
+        env: &dyn Env,
         ty: &Type,
         type_param_names: &Vec<Tokens<JavaScript>>,
     ) -> js::Tokens {
@@ -1456,7 +1456,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 _ => panic!("unexpected primitive type: {:?}", ty),
             },
             Type::Vector(ty) => {
-                quote!($reified.vector($(self.gen_reified(strct, ty, type_param_names))))
+                quote!($reified.vector($(self.gen_reified(env, ty, type_param_names))))
             }
             Type::Datatype(mid, sid, ts) => {
                 let field_module = self.env.get_module(*mid);
@@ -1474,12 +1474,12 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                     let wrap_to_phantom = (*field_val).is_phantom_parameter(idx)
                         && match &ts[idx] {
                             Type::TypeParameter(t_idx) => {
-                                !strct.is_phantom_parameter(*t_idx as usize)
+                                !env.is_phantom_parameter(*t_idx as usize)
                             }
                             _ => true,
                         };
 
-                    let inner = self.gen_reified(strct, ty, type_param_names);
+                    let inner = self.gen_reified(env, ty, type_param_names);
                     let tok = if wrap_to_phantom {
                         quote!($reified.phantom($inner))
                     } else {
@@ -1833,6 +1833,103 @@ impl<'env, 'a> StructsGen<'env, 'a> {
 
     
 
+    fn gen_enum_class_variant_type_inner2(
+        &mut self,
+        enm: &dyn Env,
+        ty: &Type,
+        type_param_names: Vec<Symbol>,
+        wrap_non_phantom_type_parameter: Option<js::Tokens>,
+        wrap_phantom_type_parameter: Option<js::Tokens>,
+    ) -> js::Tokens {
+        let to_field = &self.framework.import("reified", "ToField");
+        let to_phantom = &self
+            .framework
+            .import("reified", "ToTypeStr")
+            .with_alias("ToPhantom");
+        let vector = &self.framework.import("reified", "Vector");
+
+        let field_type = match ty {
+            Type::Primitive(ty) => match ty {
+                PrimitiveType::U8 => quote!($[str](u8)),
+                PrimitiveType::U16 => quote!($[str](u16)),
+                PrimitiveType::U32 => quote!($[str](u32)),
+                PrimitiveType::U64 => quote!($[str](u64)),
+                PrimitiveType::U128 => quote!($[str](u128)),
+                PrimitiveType::U256 => quote!($[str](u256)),
+                PrimitiveType::Bool => quote!($[str](bool)),
+                PrimitiveType::Address => quote!($[str](address)),
+                _ => panic!("unexpected primitive type: {:?}", ty),
+            },
+            Type::Vector(ty) => {
+                quote!($vector<$(self.gen_enum_class_variant_type_inner(
+                    enm, ty, type_param_names, wrap_non_phantom_type_parameter, wrap_phantom_type_parameter, false
+                ))>)
+            }
+            Type::Datatype(mid, sid, ts) => {
+                let field_module = self.env.get_module(*mid);
+
+                let field_val: Box<dyn Env> = match (field_module.find_struct(sid.symbol()), field_module.find_enum(sid.symbol())) {
+                    (Some(_), _) => Box::new(field_module.get_struct(*sid)),
+                    (_, Some(_)) => Box::new(field_module.get_enum(*sid)),
+                    _ => panic!("Neither struct nor enum found for symbol"),
+                };
+                
+                let class = self.import_ctx.get_class(&*field_val);
+
+
+                let type_param_inner_toks = (0..ts.len()).map(|idx| {
+                    let wrap_to_phantom = (*field_val).is_phantom_parameter(idx)
+                        && match &ts[idx] {
+                            Type::TypeParameter(t_idx) => {
+                                !enm.is_phantom_parameter(*t_idx as usize)
+                            }
+                            Type::Datatype(_, _, _) | Type::Vector(_) => true,
+                            _ => false,
+                        };
+
+                    let inner = self.gen_enum_class_variant_type_inner(
+                        enm,
+                        &ts[idx],
+                        type_param_names.clone(),
+                        wrap_non_phantom_type_parameter.clone(),
+                        wrap_phantom_type_parameter.clone(),
+                        false,
+                    );
+                    if wrap_to_phantom {
+                        quote!($to_phantom<$inner>)
+                    } else {
+                        quote!($inner)
+                    }
+                });
+
+                quote!($class$(if !ts.is_empty() {
+                    <$(for param in type_param_inner_toks join (, ) => $param)>
+                }))
+            }
+            Type::TypeParameter(idx) => {
+                let ty = type_param_names[*idx as usize]
+                    .display(self.symbol_pool())
+                    .to_string();
+
+                let is_phantom = enm.is_phantom_parameter(*idx as usize);
+                let wrap = if is_phantom {
+                    wrap_phantom_type_parameter
+                } else {
+                    wrap_non_phantom_type_parameter
+                };
+
+                match wrap {
+                    Some(wrap_type_parameter) => quote!($wrap_type_parameter<$ty>),
+                    None => quote!($ty),
+                }
+            }
+            _ => panic!("unexpected type: {:?}", ty),
+        };
+
+        quote!($field_type)
+
+    }
+
 
     /// Generates the `<StructName>Fields` interface.
     pub fn gen_variant_type_enum_old(&mut self, tokens: &mut js::Tokens, env: &EnumEnv) {
@@ -1880,8 +1977,9 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                                 true
                             } else {
                                 {
-                                $(for field in variant.get_fields() join (; )=> $(
-                                    field.get_name().display(self.symbol_pool()).to_string()): 
+                                $(for field in variant.get_fields() join (; )=> 
+                                    $(self.gen_field_name(&field)):
+                                    // field.get_name().display(self.symbol_pool()).to_string()): 
                                     $(self.gen_enum_class_variant_type(env, &field.get_type(), Vec::<Symbol>::new(), None, None)
                                 ))
                                 }
@@ -2613,7 +2711,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
         quote_in! { *tokens =>
             export function is$(&enum_name)(type: string): boolean {
                 type = $compress_sui_type(type);
-                return type.startsWith($(self.gen_full_name_with_address(enm, true, false)) + '<')
+                return type.startsWith($(self.gen_full_name_with_address(enm, true, false)))
             }
         }
         tokens.line();
@@ -2648,7 +2746,9 @@ impl<'env, 'a> StructsGen<'env, 'a> {
         let bcs = &js::import("@mysten/bcs", "bcs");
         let bcs_type = &js::import("@mysten/bcs", "BcsType");
         let from_b64 = &js::import("@mysten/bcs", "fromB64");
-        
+        let enum_output = &js::import("@mysten/bcs", "EnumOutputShapeWithKeys");
+        let decode_from_fields = &self.framework.import("reified", "decodeFromFields");
+
 
         let compress_sui_type = &self.framework.import("util", "compressSuiType");
 
@@ -2716,7 +2816,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 toJSONField() {
                     throw new Error ("NOT IMPLEMENTED");
                   }$['\n']
-                static reified$(params_toks_for_reified)(
+                static reified$(params_toks_for_reified.clone())(
                     $(for param in type_params_str.iter() join (, ) => $param: $param)
                 ): $(&enum_name)Reified$(
                     self.gen_params_toks(enm, type_params_str.clone(), &wraps_to_type_argument, &wraps_phantom_to_type_argument)
@@ -2740,6 +2840,10 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                                 // })
                                 data,
                             ),
+                        fromFields: (data: $(enum_output)<any,any>) =>
+                            $(&enum_name).fromFields(
+                                data
+                            ),
                         bcs: $(&enum_name).bcs,
                         new:  (data:
                                  $(self.gen_variant_type_name_with_params(enm, &wraps_to_type_argument, &wraps_phantom_to_type_argument))
@@ -2757,14 +2861,6 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                     return $(&enum_name).reified()
                 }$['\n']
 
-                // static get bcs() {
-                //     return $bcs.enum($bcs_def_name, {$['\n']
-                //         $(for field in bcs_def_name.get_fields() join (, ) =>
-                //             $(field.get_name().display(self.symbol_pool()).to_string()):
-                //                 $(self.gen_struct_bcs_def_field_value(&field.get_type(), self.strct_type_param_names(strct)))
-                //         )$['\n']
-                //     $['\n']})
-                // };$['\n']
                 static get bcs() { 
                     return $bcs.enum($bcs_def_name, {
                         $(for variant in enm.get_variants() join (, ) =>
@@ -2772,7 +2868,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                                 if variant.get_fields().next().is_none() {
                                     null
                                 } else {
-                                    $bcs.struct( $(quote) $(self.gen_variant_name(&variant))$(quote) , {
+                                    $bcs.struct( $(quote)$(self.gen_variant_name(&variant))$(quote) , {
                                         $(for field in variant.get_fields() join (, ) =>
                                             $(field.get_name().display(self.symbol_pool()).to_string()):
                                                 $(self.gen_struct_bcs_def_field_value(&field.get_type(), self.strct_type_param_names(enm)))
@@ -2782,14 +2878,70 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                             )
                         )
                     });
-                }
+                }$['\n']
+
+                // static fromFields$(params_toks_for_reified)(fields: Record<string, any>
+                // ): $(&enum_name) {
+                //     switch (data.$$kind) {
+                //         $(for variant in enm.get_variants() join ( | ) =>
+                            
+                //             case $(quote)$(self.gen_variant_name(&variant))$(quote):
+                //                 return $(&enum_name).reified().new(
+                //                     $(match variant.get_fields().length() {
+                //                         0 => (),
+                //                         _ => {{
+                //                             $(for field in &variant.get_fields() join (, ) =>
+                //                                 $(self.gen_field_name(field)): $(self.gen_from_fields_field_decode(field))
+                //                             )
+                //                         }}
+                //                     })
+                //                 )
+                //                 $['\n']
+                //         )
+                //         default: $['\n'] throw new Error(unknown variant: ${data.$kind});
+                //     }
+                // }$['\n']
+
+                static fromFields(data: $(enum_output)<any,any>): $(&enum_name) {
+                    $['\n']
+                    switch (data.$$kind) {
+                        $(for variant in enm.get_variants() join (  ) =>
+                            $['\n']
+                            case $(quote)$(self.gen_variant_name(&variant))$(quote):
+                                return $(&enum_name).reified().new(
+                                    $(match variant.get_fields().count() {
+                                        0 => {{
+                                            $(self.gen_variant_name(&variant)): true, $$kind: $(quote)$(self.gen_variant_name(&variant))$(quote)
+                                        }},
+                                        _ => {{
+                                        $(self.gen_variant_name(&variant)):{
+                                            $(for field in variant.get_fields() join (, ) =>
+                                                $(self.gen_field_name(&field)): $(decode_from_fields) 
+                                                (
+                                                $(self.gen_reified(enm, &field.get_type(), &Vec::new())), data.$(self.gen_variant_name(&variant))!.$(self.gen_field_name(&field)),
+                                                //$(self.gen_enum_class_variant_type_inner2(enm, &field.get_type(), Vec::<Symbol>::new(), None, None)).reified(), data.$(self.gen_variant_name(&variant))!.$(self.gen_field_name(&field)),
+                                                )
+                                            )
+                                        }, 
+                                        $$kind: $(quote)$(self.gen_variant_name(&variant))$(quote)
+                                    }}
+                                    })
+
+                                );
+                                
+                        )
+                        $['\n'] default: $['\n'] throw new Error( $(quote) unknown variant: $(quote) + data.$$kind  );
+                    }
+                }$['\n']
+                
+
 
                                 
                 static fromBcs(
                      data: Uint8Array
                 ): $(&enum_name) {$['\n']
-                    const parsed: $(&enum_name)Variants = $(&enum_name).bcs.parse(data);$['\n']
-                    return new $(&enum_name)([], parsed);$['\n']
+                    //const parsed: $(&enum_name)Variants = $(&enum_name).bcs.parse(data);$['\n']
+                    return $(&enum_name).fromFields($(&enum_name).bcs.parse(data))//([], parsed);$['\n']
                 }$['\n']
 
             }
