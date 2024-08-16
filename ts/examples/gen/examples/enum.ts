@@ -17,13 +17,13 @@ export function isAuthSession(type: string): boolean {
   return type === "package::module::AuthSession";
 }
 
-export type AuthSessionType = EnumOutputShapeWithKeys<
+export type AuthSessionVariants = EnumOutputShapeWithKeys<
   { Any: true; Specific: { val: ToField<"u8"> } },
   "Any" | "Specific"
 >;
 
 //only needed if we use variants as a generic i.e. defining a function myFunc<A: store> where we use a variant for A
-export type AuthSessionReified = Reified<AuthSession, AuthSessionType>;
+export type AuthSessionReified = Reified<AuthSession, AuthSessionVariants>;
 
 export class AuthSession implements EnumClass {
   static readonly $typeName = "package::module::AuthSession";
@@ -34,9 +34,9 @@ export class AuthSession implements EnumClass {
   readonly $fullTypeName: "package::module::AuthSession";
 
   readonly $typeArgs: [];
-  readonly data: AuthSessionType;
+  readonly data: AuthSessionVariants;
 
-  private constructor(typeArgs: [], data: AuthSessionType) {
+  private constructor(typeArgs: [], data: AuthSessionVariants) {
     this.$fullTypeName = composeSuiType(
       AuthSession.$typeName,
       ...typeArgs,
@@ -66,7 +66,7 @@ export class AuthSession implements EnumClass {
       //   AuthSession.fromSuiParsedData(content),
       // fetch: async (client: SuiClient, id: string) =>
       //   AuthSession.fetch(client, id),
-      new: (data: AuthSessionType) => {
+      new: (data: AuthSessionVariants) => {
         return new AuthSession([], data);
       },
       kind: "EnumClassReified",
@@ -109,25 +109,10 @@ export class AuthSession implements EnumClass {
     return new AuthSession([], parsed);
   }
 
-  // toJSONField() {
-  //   return {
-  //     workspaceId: this.workspaceId,
-  //     authenticatedUser: this.authenticatedUser,
-  //     authPermissions: fieldToJSON<Vector<"u8">>(
-  //       `vector<u8>`,
-  //       this.authPermissions,
-  //     ),
-  //     isTaskAuth: this.isTaskAuth,
-  //     executorId: fieldToJSON<Option<ID>>(
-  //       `0x1::option::Option<0x2::object::ID>`,
-  //       this.executorId,
-  //     ),
-  //     taskModuleId: fieldToJSON<Option<ID>>(
-  //       `0x1::option::Option<0x2::object::ID>`,
-  //       this.taskModuleId,
-  //     ),
-  //   };
-  // }
+  toJSONField() {
+    return {
+    };
+  }
 
   // toJSON() {
   //   return {

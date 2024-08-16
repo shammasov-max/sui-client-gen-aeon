@@ -1,0 +1,15 @@
+[package]
+name = "aeon-custody"
+version = "0.0.1"
+edition = "2024.beta"
+
+[dependencies.Sui]
+git = "https://github.com/alexanderludwig/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "main"
+
+[dependencies.sui-state-proof]
+local = "../sui-state-proof"
+
+[addresses]
+aeon_custody = "0x963b0d62872089ae28a2f3046a9d547d357681d32958f8769f4e5c37cdc8fe52"

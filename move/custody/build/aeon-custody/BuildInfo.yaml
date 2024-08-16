@@ -1,0 +1,32 @@
+---
+compiled_package_info:
+  package_name: aeon-custody
+  address_alias_instantiation:
+    aeon_custody: "0000000000000000000000000000000000000000000000000000000000000000"
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+    sui: "0000000000000000000000000000000000000000000000000000000000000002"
+    sui_state_proof: 74e7a89230c57e1ae5a60162b9e9de44c1e2baf140463dc54f2e1da882aacc0b
+  source_digest: 9101F4CD98A0B14E06A4CD9E7B27DAADDD5545D856A2729433E5ADC4D9609393
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: "./Move.lock"
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    default_flavor: sui
+    default_edition: ~
+    deps_as_root: false
+    silence_warnings: false
+    warnings_are_errors: false
+    json_errors: false
+    additional_named_addresses: {}
+    lint_flag:
+      no_lint: false
+      lint: false
+dependencies:
+  - MoveStdlib
+  - Sui
+  - sui-state-proof

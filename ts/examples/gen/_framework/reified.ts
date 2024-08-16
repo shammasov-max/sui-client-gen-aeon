@@ -1,6 +1,8 @@
 import { BcsType, bcs, fromHEX, toHEX } from '@mysten/bcs'
 import { FieldsWithTypes, compressSuiType, parseTypeName } from './util'
 import { SuiClient, SuiParsedData } from '@mysten/sui/client'
+import { EnumOutputShapeWithKeys } from "@mysten/bcs";
+
 
 export interface StructClass {
   $typeName: string
@@ -9,6 +11,30 @@ export interface StructClass {
   toJSONField(): Record<string, any>
   toJSON(): Record<string, any>
 }
+
+export interface EnumClass {
+  $typeName: string;
+  $fullTypeName: string;
+  $typeArgs: string[];
+}
+
+export interface EnumClassReified<T extends EnumClass, Data> {
+  typeName: T["$typeName"]; // e.g., '0x2::balance::Balance', without type arguments
+  fullTypeName: ToTypeStr<T>;
+  typeArgs: T["$typeArgs"]; // e.g., ['0x2::sui:SUI']
+  reifiedTypeArgs: Array<
+    Reified<TypeArgument, any> | PhantomReified<PhantomTypeArgument>
+  >;
+  fromBcs(data: Uint8Array): T;
+  bcs: BcsType<any>;
+  // fromJSONField: (field: any) => T;
+  // fromFields: (fields: EnumOutputShapeWithKeys<any, string>) => T;
+  // fromFieldsWithTypes: (item: DataWithTypes) => T;
+  new: (data: Data) => T;
+
+  kind: "EnumClassReified";
+}
+
 
 export interface VectorClass {
   $fullTypeName: string
@@ -36,7 +62,7 @@ export class Vector<T extends TypeArgument> implements VectorClass {
 }
 
 export type Primitive = 'bool' | 'u8' | 'u16' | 'u32' | 'u64' | 'u128' | 'u256' | 'address'
-export type TypeArgument = StructClass | Primitive | VectorClass
+export type TypeArgument = StructClass | EnumClass | Primitive | VectorClass
 
 export interface StructClassReified<T extends StructClass, Fields> {
   typeName: T['$typeName'] // e.g., '0x2::balance::Balance', without type arguments

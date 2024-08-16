@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@mysten/bcs": "^1.0.2",
-    "@mysten/sui": "^1.2.0",
+    "@mysten/sui": "^1.6.0",
     "commander": "^12.1.0",
     "tsup": "^8.1.0"
   }
