@@ -2710,7 +2710,7 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                     this.$$data = data;$['\n']
                 }$['\n']
 
-                static toJSONField() {
+                toJSONField() {
                     throw new Error ("NOT IMPLEMENTED");
                   }$['\n']
 
