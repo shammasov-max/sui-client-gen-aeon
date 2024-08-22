@@ -539,7 +539,7 @@ export interface EnumClassReified<T extends EnumClass, Data> {
   bcs: BcsType<any>;
   // fromJSONField: (field: any) => T;
   fromFields: (fields: EnumOutputShapeWithKeys<any, string>) => T;
-  // fromFieldsWithTypes: (item: DataWithTypes) => T;
+  fromFieldsWithTypes: (fields: EnumOutputShapeWithKeys<any, string>) => T;
   new: (data: Data) => T;
 
   kind: "EnumClassReified";
@@ -880,11 +880,7 @@ export function decodeFromFieldsWithTypes(
       );
     }
     default:
-      if ("fromFieldsWithTypes" in reified) {
         return reified.fromFieldsWithTypes(item);
-      } else {
-        throw new Error("Enum class cant be decoded from fields with types");
-      }
   }
 }
 

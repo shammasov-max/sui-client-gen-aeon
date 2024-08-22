@@ -2710,9 +2710,10 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                     this.$$data = data;$['\n']
                 }$['\n']
 
-                toJSONField() {
+                static toJSONField() {
                     throw new Error ("NOT IMPLEMENTED");
                   }$['\n']
+
                 static reified$(params_toks_for_reified.clone())(
                     $(for param in type_params_str.iter() join (, ) => $param: $param)
                 ): $(&enum_name)Reified$(
@@ -2739,6 +2740,10 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                             ),
                         fromFields: (data: $(enum_output)<any,any>) =>
                             $(&enum_name).fromFields(
+                                data
+                            ),
+                        fromFieldsWithTypes: (data: $(enum_output)<any,any>) =>
+                            $(&enum_name).fromFieldsWithTypes(
                                 data
                             ),
                         bcs: $(&enum_name).bcs,
