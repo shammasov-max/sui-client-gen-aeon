@@ -2711,8 +2711,8 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 }$['\n']
 
                 toJSONField() {
-                    throw new Error ("NOT IMPLEMENTED");
-                  }$['\n']
+                    return JSON.stringify(this.$$data);
+                }$['\n']
 
                 static reified$(params_toks_for_reified.clone())(
                     $(for param in type_params_str.iter() join (, ) => $param: $param)
