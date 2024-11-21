@@ -2711,7 +2711,9 @@ impl<'env, 'a> StructsGen<'env, 'a> {
                 }$['\n']
 
                 toJSONField() {
-                    return JSON.stringify(this.$$data);
+                    return JSON.stringify(this.$$data, (_key, value) => 
+                        typeof value === 'bigint' ? value.toString() : value
+                    );
                 }$['\n']
 
                 static reified$(params_toks_for_reified.clone())(
