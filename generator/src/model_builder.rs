@@ -143,7 +143,9 @@ async fn build_source_model<Progress: Write>(
         default_flavor: Some(ME::Flavor::Sui),
         ..Default::default()
     };
-    let resolved_graph = build_config.resolution_graph_for_package(stub_path, &mut io::stderr())?;
+
+    // TOOD remove hardcoding of id
+    let resolved_graph = build_config.resolution_graph_for_package(stub_path, Some(103.to_string()), &mut io::stderr())?;
 
     let source_id_map = find_address_origins(&resolved_graph);
     let source_published_at = resolve_published_at(&resolved_graph, &source_id_map);
@@ -159,6 +161,7 @@ async fn build_source_model<Progress: Write>(
 
     let mut stderr = StandardStream::stderr(ColorChoice::Always);
     source_env.report_diag(&mut stderr, Severity::Warning);
+    source_env.report_diag(&mut stderr, Severity::Error);
 
     if source_env.has_errors() {
         bail!("Source model has errors.");
